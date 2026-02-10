@@ -35,6 +35,10 @@ from rag.llm import FACTORY_DEFAULT_BASE_URL, LITELLM_PROVIDER_PREFIX, Supported
 from rag.nlp import is_chinese, is_english
 
 from common.misc_utils import thread_pool_exec
+from rag.llm.ollama_loopless_client import OllamaLooplessClient, GenerateChunk
+from rag.llm.openai_loopless_client import OpenAILooplessClient
+
+
 class LLMErrorCode(StrEnum):
     ERROR_RATE_LIMIT = "RATE_LIMIT_EXCEEDED"
     ERROR_AUTHENTICATION = "AUTH_ERROR"
@@ -590,6 +594,305 @@ class BaiChuanChat(Base):
         yield total_tokens
 
 
+# ============================================================================
+# Loopless (Acyclic) Chat Helpers
+# ============================================================================
+
+
+def _parse_floats(s: str) -> list:
+    """Parse comma-separated float string into a list."""
+    if not s or not s.strip():
+        return []
+    return [float(x.strip()) for x in s.split(",")]
+
+
+def _parse_additional_conf(additional_conf: dict | None) -> dict:
+    """Extract and validate loopless parameters from additional_conf."""
+    if additional_conf is None:
+        additional_conf = {}
+    result = {
+        "show_retries": additional_conf.get("show_retries", False),
+        "retries_count": additional_conf.get("retries_count", 0),
+        "check_every_n": additional_conf.get("check_every_n", 8),
+        "loop_min_chars": additional_conf.get("loop_min_chars", 50),
+        "loop_thresh": additional_conf.get("loop_thresh", 3),
+        "prompt_suffix_on_retry": additional_conf.get(
+            "prompt_suffix_on_retry", "\n\nPlease respond without repeating yourself.\n\n"
+        ),
+        "show_thinking": additional_conf.get("show_thinking", False),
+        "model_context_const_size": additional_conf.get("model_context_const_size", 0),
+    }
+    try:
+        result["temperature_shift"] = _parse_floats(additional_conf.get("retry_temp_shift", ""))
+    except (ValueError, TypeError):
+        result["temperature_shift"] = []
+    try:
+        result["timeout_shift"] = _parse_floats(additional_conf.get("retry_timeout_shift", ""))
+    except (ValueError, TypeError):
+        result["timeout_shift"] = []
+    return result
+
+
+def _format_with_failed_attempts(current_answer: str, failed_attempts: list, show_retry_attempts: bool) -> str:
+    """Format answer including failed loop attempts in <details> tags."""
+    if not failed_attempts or not show_retry_attempts:
+        return current_answer
+    details_blocks = []
+    for attempt_info in failed_attempts:
+        attempt_num = attempt_info["attempt"]
+        content = attempt_info["content"]
+        details_blocks.append(
+            f'<details><summary><i>Failed attempt #{attempt_num} (loop detected)</i></summary>\n\n'
+            f"{content}\n\n</details><br>\n\n"
+        )
+    return "".join(details_blocks) + current_answer
+
+
+def _strip_thinking_details(text: str) -> str:
+    """Remove thinking <details> blocks to avoid nesting."""
+    return re.sub(
+        r"<details><summary>(?:<i>)?(?:Раздумывания|Thinking)(?:</i>)?</summary>.*?</details>(?:<br>)?",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def _process_thinking_content(thinking_content: str, show_thinking: bool, reasoning_started: bool, ans: str):
+    """Process thinking content and return (updated_ans, reasoning_started)."""
+    if not thinking_content:
+        return ans, reasoning_started
+    if show_thinking:
+        if not reasoning_started:
+            ans += "<details><summary><i>Thinking</i></summary><i>" + thinking_content
+            return ans, True
+        else:
+            ans += thinking_content
+            return ans, True
+    else:
+        if not reasoning_started:
+            ans += "<details><summary><i>Thinking</i></summary><i>The model is reasoning. Please wait...</i></details><br>"
+            return ans, True
+        return ans, True
+
+
+def _close_reasoning(ans: str, show_thinking: bool, reasoning_started: bool):
+    """Close reasoning <details> tag if open."""
+    if reasoning_started and show_thinking:
+        return ans + "</i></details><br>", False
+    if reasoning_started:
+        return ans, False
+    return ans, reasoning_started
+
+
+# ============================================================================
+# OllamaChat - Native Ollama client with loop detection
+# ============================================================================
+
+
+class OllamaChat(Base):
+    _FACTORY_NAME = "Ollama"
+    has_retry_options = True
+
+    def __init__(self, key, model_name, base_url=None, **kwargs):
+        super().__init__(key, model_name, base_url=base_url, **kwargs)
+
+        from ollama import Client
+        raw_client = Client(host=base_url) if not key or key == "x" else Client(host=base_url, headers={"Authorization": f"Bearer {key}"})
+        self.loopless_client = OllamaLooplessClient(
+            client=raw_client,
+            default_model=model_name,
+            log_level=kwargs.get("log_level", logging.INFO),
+        )
+        self.model_name = model_name
+
+    def _clean_conf(self, gen_conf):
+        options = {}
+        if "max_tokens" in gen_conf:
+            options["num_predict"] = gen_conf.pop("max_tokens")
+        if "temperature" in gen_conf:
+            options["temperature"] = gen_conf.pop("temperature")
+        if "top_p" in gen_conf:
+            options["top_p"] = gen_conf.pop("top_p")
+        if "presence_penalty" in gen_conf:
+            options["presence_penalty"] = gen_conf.pop("presence_penalty")
+        if "frequency_penalty" in gen_conf:
+            options["frequency_penalty"] = gen_conf.pop("frequency_penalty")
+        return options
+
+    def _calculate_dynamic_ctx(self, history):
+        """Calculate dynamic context size based on message content."""
+        total_chars = sum(len(str(m.get("content", ""))) for m in history)
+        estimated_tokens = total_chars // 3
+        return max(8192, estimated_tokens * 2)
+
+    def _chat(self, history, gen_conf={}, **kwargs):
+        options = self._clean_conf(gen_conf)
+        ctx_size = self._calculate_dynamic_ctx(history)
+        options["num_ctx"] = ctx_size
+        response = self.loopless_client.chat(
+            model=self.model_name,
+            messages=history,
+            stream=False,
+            options=options,
+            keep_alive="1m",
+        )
+        ans = response["message"]["content"].strip()
+        token_count = response.get("eval_count", 0) + response.get("prompt_eval_count", 0)
+        return ans, token_count
+
+    def chat(self, system, history, gen_conf, additional_conf: dict = None):
+        if system:
+            history.insert(0, {"role": "system", "content": system})
+        conf = _parse_additional_conf(additional_conf)
+        options = self._clean_conf(gen_conf)
+        ctx_size = conf["model_context_const_size"] or self._calculate_dynamic_ctx(history)
+        options["num_ctx"] = ctx_size
+
+        ans = ""
+        token_count = 0
+        failed_attempts = []
+        reasoning_started = False
+
+        try:
+            prev_attempt = 0
+            response = self.loopless_client.chat(
+                model=self.model_name,
+                messages=history,
+                stream=True,
+                options=options,
+                keep_alive="1m",
+                retries=conf["retries_count"],
+                temperature_shift=conf["temperature_shift"],
+                retry_delays=conf["timeout_shift"],
+                prompt_suffix_on_retry=conf["prompt_suffix_on_retry"],
+                check_every_n=conf["check_every_n"],
+                loop_min_chars=conf["loop_min_chars"],
+                loop_thresh=conf["loop_thresh"],
+            )
+            for result in response:
+                if result.is_loop_end:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    final = _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"])
+                    return final + "\n\n**WARNING**: Generation stopped due to detected repetition loop.", token_count
+
+                if result.attempt != prev_attempt:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    failed_attempts.append({"attempt": prev_attempt + 1, "content": _strip_thinking_details(ans)})
+                    prev_attempt = result.attempt
+                    ans = ""
+
+                resp = result.chunk
+                content = ""
+                thinking_content = ""
+                if isinstance(resp, dict):
+                    done = resp.get("done", False)
+                    message = resp.get("message", {})
+                    content = message.get("content", "")
+                    thinking_content = message.get("thinking", "") or resp.get("thinking", "")
+                    if done:
+                        ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                        token_count = resp.get("prompt_eval_count", 0) + resp.get("eval_count", 0)
+                        return _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"]), token_count
+                else:
+                    done = getattr(resp, "done", False)
+                    message = getattr(resp, "message", None)
+                    content = getattr(message, "content", "") if message else ""
+                    thinking_content = getattr(message, "thinking", "") if message else ""
+                    if done:
+                        ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                        token_count = getattr(resp, "prompt_eval_count", 0) + getattr(resp, "eval_count", 0)
+                        return _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"]), token_count
+
+                ans, reasoning_started = _process_thinking_content(thinking_content, conf["show_thinking"], reasoning_started, ans)
+                if content:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    ans += content
+
+            return _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"]), token_count
+        except Exception as e:
+            return "**ERROR**: " + str(e), 0
+
+    def chat_streamly(self, system, history, gen_conf, additional_conf: dict = None):
+        if system:
+            history.insert(0, {"role": "system", "content": system})
+        conf = _parse_additional_conf(additional_conf)
+        options = self._clean_conf(gen_conf)
+        ctx_size = conf["model_context_const_size"] or self._calculate_dynamic_ctx(history)
+        options["num_ctx"] = ctx_size
+
+        ans = ""
+        token_count = 0
+        failed_attempts = []
+        reasoning_started = False
+
+        try:
+            prev_attempt = 0
+            response = self.loopless_client.chat(
+                model=self.model_name,
+                messages=history,
+                stream=True,
+                options=options,
+                keep_alive="1m",
+                retries=conf["retries_count"],
+                temperature_shift=conf["temperature_shift"],
+                retry_delays=conf["timeout_shift"],
+                prompt_suffix_on_retry=conf["prompt_suffix_on_retry"],
+                check_every_n=conf["check_every_n"],
+                loop_min_chars=conf["loop_min_chars"],
+                loop_thresh=conf["loop_thresh"],
+            )
+            for result in response:
+                if result.is_loop_end:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    final = _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"])
+                    yield final + "\n\n**WARNING**: Generation stopped due to detected repetition loop."
+                    yield token_count
+                    return
+
+                if result.attempt != prev_attempt:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    failed_attempts.append({"attempt": prev_attempt + 1, "content": _strip_thinking_details(ans)})
+                    prev_attempt = result.attempt
+                    ans = ""
+
+                resp = result.chunk
+                content = ""
+                thinking_content = ""
+                if isinstance(resp, dict):
+                    done = resp.get("done", False)
+                    message = resp.get("message", {})
+                    content = message.get("content", "")
+                    thinking_content = message.get("thinking", "") or resp.get("thinking", "")
+                    if done:
+                        ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                        token_count = resp.get("prompt_eval_count", 0) + resp.get("eval_count", 0)
+                        yield _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"])
+                        yield token_count
+                        return
+                else:
+                    done = getattr(resp, "done", False)
+                    message = getattr(resp, "message", None)
+                    content = getattr(message, "content", "") if message else ""
+                    thinking_content = getattr(message, "thinking", "") if message else ""
+                    if done:
+                        ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                        token_count = getattr(resp, "prompt_eval_count", 0) + getattr(resp, "eval_count", 0)
+                        yield _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"])
+                        yield token_count
+                        return
+
+                ans, reasoning_started = _process_thinking_content(thinking_content, conf["show_thinking"], reasoning_started, ans)
+                if content:
+                    ans, reasoning_started = _close_reasoning(ans, conf["show_thinking"], reasoning_started)
+                    ans += content
+                yield _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"])
+
+        except Exception as e:
+            yield _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"]) + "\n**ERROR**: " + str(e)
+        yield token_count
+
+
 class LocalAIChat(Base):
     _FACTORY_NAME = "LocalAI"
 
@@ -733,12 +1036,23 @@ class LmStudioChat(Base):
 
 class OpenAI_APIChat(Base):
     _FACTORY_NAME = ["VLLM", "OpenAI-API-Compatible"]
+    has_retry_options = True
 
     def __init__(self, key, model_name, base_url, **kwargs):
         if not base_url:
             raise ValueError("url cannot be None")
         model_name = model_name.split("___")[0]
         super().__init__(key, model_name, base_url, **kwargs)
+
+        # Wrap with loopless client for loop detection support
+        timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", 600))
+        self.loopless_client = OpenAILooplessClient(
+            api_key=key,
+            base_url=base_url,
+            timeout=timeout,
+            default_model=model_name,
+            log_level=kwargs.get("log_level", logging.INFO),
+        )
 
 
 class LeptonAIChat(Base):
