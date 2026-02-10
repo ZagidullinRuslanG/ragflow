@@ -14,7 +14,9 @@
 #  limitations under the License.
 #
 import json
+import logging
 from abc import ABC
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
 
 import httpx
@@ -502,3 +504,68 @@ class JiekouAIRerank(JinaRerank):
         if not base_url:
             base_url = "https://api.jiekou.ai/openai/v1/rerank"
         super().__init__(key, model_name, base_url)
+
+
+class OllamaRerank(Base):
+    _FACTORY_NAME = "Ollama"
+
+    RERANK_PROMPT = (
+        "You are a relevance scoring system. Rate how relevant the passage is to the query.\n"
+        "Respond with ONLY a JSON object: {\"score\": <number>}\n"
+        "Score from 0 (completely irrelevant) to 10 (perfectly relevant).\n\n"
+        "Query: {query}\n\n"
+        "Passage: {passage}\n\n"
+        "JSON response:"
+    )
+
+    def __init__(self, key, model_name, base_url=None, **kwargs):
+        from ollama import Client
+        self.client = (
+            Client(host=base_url)
+            if not key or key == "x"
+            else Client(host=base_url, headers={"Authorization": f"Bearer {key}"})
+        )
+        self.model_name = model_name
+
+    def _score_one(self, query: str, passage: str) -> float:
+        prompt = self.RERANK_PROMPT.format(query=query, passage=truncate(passage, 2048))
+        try:
+            resp = self.client.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                stream=False,
+                options={"temperature": 0.0, "num_predict": 32},
+                keep_alive="1m",
+            )
+            content = resp["message"]["content"].strip()
+            parsed = json.loads(content)
+            score = float(parsed.get("score", 0))
+            return max(0.0, min(10.0, score))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            logging.debug(f"OllamaRerank parse error: {e}, raw: {content if 'content' in dir() else 'N/A'}")
+            return 0.0
+        except Exception as e:
+            logging.warning(f"OllamaRerank scoring error: {e}")
+            return 0.0
+
+    def similarity(self, query: str, texts: list):
+        if not texts:
+            return np.array([]), 0
+
+        token_count = num_tokens_from_string(query)
+        for t in texts:
+            token_count += num_tokens_from_string(t)
+
+        scores = np.zeros(len(texts), dtype=float)
+        with ThreadPoolExecutor(max_workers=min(8, len(texts))) as pool:
+            futures = {pool.submit(self._score_one, query, t): i for i, t in enumerate(texts)}
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    scores[idx] = future.result()
+                except Exception:
+                    scores[idx] = 0.0
+
+        # Normalize to 0-1 range
+        scores = scores / 10.0
+        return scores, token_count
