@@ -422,6 +422,12 @@ Example: A 1 KB message with 1024-dim embedding uses ~9 KB. The 5 MB default lim
         'The document is associated with the knowledge graph. After deletion, the related node and relationship information will be deleted, but the graph will not be updated immediately. The update graph action is performed during the process of parsing the new document that carries the knowledge graph extraction task.',
       plainText: 'Naive',
       reRankModelWaring: 'Re-rank model is very time consuming.',
+      additionalParsingInfo: 'Additional parameters',
+      additionalParsingInfoTip:
+        'Available parameters:<br><b>--lower_boundary</b> 6.7 - defines bottom margin of the document, %;<br>--upper_boundary 4.0 - defines top margin of the document, %',
+      additionalParsingInfoInputField:
+        'Enter additional parsing information...',
+      additionalParsingInfoTooltip: '<b>Additional parsing information.</b>',
     },
     knowledgeConfiguration: {
       globalIndexModelTip:
@@ -888,6 +894,49 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       tocEnhanceTip: ` During the parsing of the document, table of contents information was generated (see the 'Enable Table of Contents Extraction' option in the General method). This allows the large model to return table of contents items relevant to the user's query, thereby using these items to retrieve related chunks and apply weighting to these chunks during the sorting process. This approach is derived from mimicking the behavioral logic of how humans search for knowledge in books.`,
       batchDeleteSessions: 'Batch delete',
       deleteSelectedConfirm: 'Delete the selected {count} session(s)?',
+      knowledgeBasesSec: 'Secondary knowledge bases',
+      knowledgeBasesSecMessage: 'Please select',
+      knowledgeBasesSecTip:
+        'Select knowledge bases to associate with this chat assistant. Empty knowledge bases will not appear in the dropdown.',
+      modelContextConstSize: 'Model context window',
+      modelContextConstSizeMessage: 'Model context window',
+      modelContextConstSizeTip:
+        'Specify any non-zero number to set a constant context window. Set to 0 to let the system dynamically determine the context window. Strongly affects VRAM!',
+      retryTempShift: 'Temperature shift',
+      retryTempShiftMessage: 'Temperature shift',
+      retryTempShiftTip:
+        'Temperature shift on retry attempts in format "0.1, 0.2" - on first attempt t = configured temperature (if not set, = 0), on second t = 0.1, on third t = 0.2, on subsequent t = 0.2',
+      retryTimeoutShift: 'Timeout shift',
+      retryTimeoutShiftMessage: 'Timeout shift',
+      retryTimeoutShiftTip:
+        'Request delay shift on retry attempts in format "0, 0.1, 0.2" - on first attempt To = 0, on second To = 0.1, on third To = 0.2, on subsequent To = 0.2',
+      showRetries: 'Show failed attempts',
+      showRetriesMessage: 'Show failed attempts',
+      showRetriesTip:
+        'Show failed response attempts with detected loops in the model response',
+      retriesCount: 'Retry count',
+      retriesCountMessage: 'Retry count',
+      retriesCountTip:
+        'How many times the model will retry if a cyclic response is detected. Set to 0 for no retries.',
+      loopMinChars: 'Min chars for loop detection',
+      loopMinCharsMessage: 'Min chars for loop detection',
+      loopMinCharsTip:
+        'Minimum number of characters used to detect cyclicity. Default value is 50',
+      loopThresh: 'Max repetition count',
+      loopThreshMessage: 'Max repetition count',
+      loopThreshTip:
+        'Maximum number of detected repetitions before the response is considered cyclic. Default value is 3.',
+      promptSuffixOnRetry: 'Retry prompt suffix',
+      promptSuffixOnRetryMessage: 'Retry prompt suffix',
+      promptSuffixOnRetryTip:
+        'String appended to the end of the prompt on retry attempts.',
+      checkEveryN: 'Check every N tokens',
+      checkEveryNMessage: 'Check every N tokens',
+      checkEveryNTip: 'Check for cyclicity every N tokens. Default value is 8.',
+      showThinking: 'Show thinking',
+      showThinkingMessage: 'Show thinking',
+      showThinkingTip:
+        'Shows the thinking stage of models in chat (if supported)',
     },
     setting: {
       Verify: 'Verify',
@@ -1530,6 +1579,9 @@ Example: Virtual Hosted Style`,
       retrieval: 'Retrieval',
       generate: 'Generate',
       answer: 'Interact',
+      answer2: 'Interact 2',
+      answer2Description:
+        'A human-bot interaction component (Version 2). Used to output the final answer to the user. Also used to specify the knowledge base whose settings will be used for parsing documents (if a user attaches a document during chat).',
       categorize: 'Categorize',
       rewriteQuestion: 'Rewrite',
       rewrite: 'Rewrite',
