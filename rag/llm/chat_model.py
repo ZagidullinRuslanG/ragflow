@@ -136,6 +136,8 @@ class Base(ABC):
         }
 
         gen_conf = {k: v for k, v in gen_conf.items() if k in allowed_conf}
+        if "temperature" not in gen_conf:
+            gen_conf["temperature"] = 0.0
         return gen_conf
 
     async def _async_chat_streamly(self, history, gen_conf, **kwargs):
@@ -664,14 +666,14 @@ def _process_thinking_content(thinking_content: str, show_thinking: bool, reason
         return ans, reasoning_started
     if show_thinking:
         if not reasoning_started:
-            ans += "<details><summary><i>Thinking</i></summary><i>" + thinking_content
+            ans += "<details><summary><i>Раздумывания</i></summary><i>" + thinking_content
             return ans, True
         else:
             ans += thinking_content
             return ans, True
     else:
         if not reasoning_started:
-            ans += "<details><summary><i>Thinking</i></summary><i>The model is reasoning. Please wait...</i></details><br>"
+            ans += "<details><summary><i>Раздумывания</i></summary><i>Размышления скрыты</i></details><br>"
             return ans, True
         return ans, True
 
@@ -712,6 +714,8 @@ class OllamaChat(Base):
             options["num_predict"] = gen_conf.pop("max_tokens")
         if "temperature" in gen_conf:
             options["temperature"] = gen_conf.pop("temperature")
+        else:
+            options["temperature"] = 0.0
         if "top_p" in gen_conf:
             options["top_p"] = gen_conf.pop("top_p")
         if "presence_penalty" in gen_conf:
