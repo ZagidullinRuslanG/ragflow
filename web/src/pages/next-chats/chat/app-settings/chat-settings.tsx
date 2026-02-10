@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { z } from 'zod';
+import { ChatAcyclicSettings } from './chat-acyclic-settings';
 import ChatBasicSetting from './chat-basic-settings';
 import { ChatModelSettings } from './chat-model-settings';
 import { ChatPromptEngine } from './chat-prompt-engine';
@@ -56,6 +57,17 @@ export function ChatSettings({ hasSingleChatBox }: ChatSettingsProps) {
         cross_languages: [],
         toc_enhance: false,
       },
+      kb_ids_sec: [],
+      model_context_const_size: 0,
+      retries_count: 0,
+      retry_temp_shift: '',
+      retry_timeout_shift: '',
+      show_retries: false,
+      loop_min_chars: 50,
+      loop_thresh: 3,
+      prompt_suffix_on_retry: '',
+      check_every_n: 8,
+      show_thinking: false,
       top_n: 8,
       similarity_threshold: 0.2,
       vector_similarity_weight: 0.2,
@@ -134,6 +146,8 @@ export function ChatSettings({ hasSingleChatBox }: ChatSettingsProps) {
             <ChatPromptEngine></ChatPromptEngine>
             <Separator />
             <ChatModelSettings></ChatModelSettings>
+            <Separator />
+            <ChatAcyclicSettings></ChatAcyclicSettings>
           </section>
           <div className="space-x-5 text-right pt-4">
             <Button variant={'outline'} onClick={switchSettingVisible}>

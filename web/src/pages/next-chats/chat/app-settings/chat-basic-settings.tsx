@@ -1,7 +1,10 @@
 'use client';
 
 import { AvatarUpload } from '@/components/avatar-upload';
-import { KnowledgeBaseFormField } from '@/components/knowledge-base-item';
+import {
+  KnowledgeBaseFormField,
+  useDisableDifferenceEmbeddingDataset,
+} from '@/components/knowledge-base-item';
 import { MetadataFilter } from '@/components/metadata-filter';
 import { SwitchFormField } from '@/components/switch-fom-field';
 import { TavilyFormField } from '@/components/tavily-form-field';
@@ -14,6 +17,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslate } from '@/hooks/common-hooks';
 import { useFormContext } from 'react-hook-form';
@@ -21,6 +25,7 @@ import { useFormContext } from 'react-hook-form';
 export default function ChatBasicSetting() {
   const { t } = useTranslate('chat');
   const form = useFormContext();
+  const { datasetOptions } = useDisableDifferenceEmbeddingDataset();
 
   return (
     <div className="space-y-8">
@@ -113,6 +118,29 @@ export default function ChatBasicSetting() {
       <TOCEnhanceFormField name="prompt_config.toc_enhance"></TOCEnhanceFormField>
       <TavilyFormField></TavilyFormField>
       <KnowledgeBaseFormField></KnowledgeBaseFormField>
+      <FormField
+        control={form.control}
+        name="kb_ids_sec"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel tooltip={t('knowledgeBasesSecTip')}>
+              {t('knowledgeBasesSec')}
+            </FormLabel>
+            <FormControl>
+              <MultiSelect
+                options={datasetOptions}
+                onValueChange={field.onChange}
+                placeholder={t('knowledgeBasesSecMessage')}
+                variant="inverted"
+                maxCount={100}
+                defaultValue={field.value}
+                showSelectAll={false}
+                {...field}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
       <MetadataFilter></MetadataFilter>
     </div>
   );

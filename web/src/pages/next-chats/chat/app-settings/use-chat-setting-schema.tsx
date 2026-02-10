@@ -45,6 +45,7 @@ export function useChatSettingSchema() {
     kb_ids: z.array(z.string()).min(0, {
       message: t('knowledgeBasesMessage'),
     }),
+    kb_ids_sec: z.array(z.string()).optional(),
     prompt_config: promptConfigSchema,
     ...rerankFormSchema,
     llm_setting: z.object(LlmSettingFieldSchema),
@@ -54,6 +55,17 @@ export function useChatSettingSchema() {
     ...similarityThresholdSchema,
     ...topnSchema,
     ...MetadataFilterSchema,
+    // Acyclic (loopless) client configuration
+    model_context_const_size: z.coerce.number().optional(),
+    retries_count: z.coerce.number().optional(),
+    retry_temp_shift: z.string().optional(),
+    retry_timeout_shift: z.string().optional(),
+    show_retries: z.boolean().optional(),
+    loop_min_chars: z.coerce.number().optional(),
+    loop_thresh: z.coerce.number().optional(),
+    prompt_suffix_on_retry: z.string().optional(),
+    check_every_n: z.coerce.number().optional(),
+    show_thinking: z.boolean().optional(),
   });
 
   return formSchema;

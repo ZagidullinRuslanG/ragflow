@@ -898,6 +898,7 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       knowledgeBasesSecMessage: 'Please select',
       knowledgeBasesSecTip:
         'Select knowledge bases to associate with this chat assistant. Empty knowledge bases will not appear in the dropdown.',
+      acyclicClientSettings: 'Acyclic Client Settings',
       modelContextConstSize: 'Model context window',
       modelContextConstSizeMessage: 'Model context window',
       modelContextConstSizeTip:

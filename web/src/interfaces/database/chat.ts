@@ -45,6 +45,7 @@ export interface IDialog {
   id: string;
   dialog_id: string;
   kb_ids: string[];
+  kb_ids_sec: string[];
   kb_names: string[];
   language: string;
   llm_id: string;
@@ -62,6 +63,17 @@ export interface IDialog {
   top_k: number;
   top_n: number;
   meta_data_filter: MetaDataFilter;
+  // Acyclic (loopless) client configuration
+  model_context_const_size: number;
+  retries_count: number;
+  retry_temp_shift: string;
+  retry_timeout_shift: string;
+  show_retries: boolean;
+  loop_min_chars: number;
+  loop_thresh: number;
+  prompt_suffix_on_retry: string;
+  check_every_n: number;
+  show_thinking: boolean;
 }
 
 interface MetaDataFilter {

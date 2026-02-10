@@ -725,6 +725,7 @@ export default {
       knowledgeBasesSecMessage: 'Пожалуйста, выберите',
       knowledgeBasesSecTip:
         'Выберите базы знаний, которые будут связаны с этим чат-ассистентом. Пустые базы знаний не будут отображаться в выпадающем списке.',
+      acyclicClientSettings: 'Настройки ацикличного клиента',
       modelContextConstSize: 'Окно контекста модели',
       modelContextConstSizeMessage: 'Окно контекста модели',
       modelContextConstSizeTip:
