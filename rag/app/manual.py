@@ -29,6 +29,10 @@ from PIL import Image
 from rag.app.naive import by_plaintext, PARSERS
 from common.parser_config_utils import normalize_layout_recognizer
 
+# Custom parser names that trigger the pdfminer/vision pipeline
+CUSTOM_PDFMINER_NAMES = {"custom pdfminer", "custompdfminer"}
+CUSTOM_VISION_LLM_NAMES = {"custom vision llm", "customvisionllm"}
+
 
 class Pdf(PdfParser):
     def __init__(self):
@@ -180,7 +184,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
     parser_config = kwargs.get("parser_config", {"chunk_token_num": 512, "delimiter": "\n!?。；！？", "layout_recognize": "DeepDOC"})
     pdf_parser = None
     doc = {"docnm_kwd": filename}
-    doc["title_tks"] = rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Z]+$", "", doc["docnm_kwd"]))
+    doc["title_tks"] = rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Zа-яА-Я]+$", "", doc["docnm_kwd"]))
     doc["title_sm_tks"] = rag_tokenizer.fine_grained_tokenize(doc["title_tks"])
     # is it English
     eng = lang.lower() == "english"  # pdf_parser.is_english
@@ -191,6 +195,39 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
             layout_recognizer = "DeepDOC" if layout_recognizer else "Plain Text"
 
         name = layout_recognizer.strip().lower()
+
+        # Custom pdfminer-based parser with Russian-specific layout analysis
+        if name in CUSTOM_PDFMINER_NAMES:
+            from rag.app.pdf_custom_parser import parse_pdf_pages
+            callback(0.1, "Start to parse (Custom PDFMiner).")
+            res = parse_pdf_pages(
+                filename if not binary else binary,
+                filename,
+                3,
+                from_page,
+                to_page,
+                parser_config,
+            )
+            callback(0.8, "Finish parsing.")
+            return res
+
+        # Custom vision LLM parser (converts pages to images, uses LLM to extract markdown)
+        if name in CUSTOM_VISION_LLM_NAMES:
+            from rag.app.pdf_custom_parser import parse_pdf_as_images
+            tenant_id = kwargs.get("tenant_id", -1)
+            callback(0.1, "Start to parse (Custom Vision LLM).")
+            res = parse_pdf_as_images(
+                filename if not binary else binary,
+                filename,
+                3,
+                from_page,
+                to_page,
+                parser_config,
+                tenant_id,
+            )
+            callback(0.8, "Finish parsing.")
+            return res
+
         pdf_parser = PARSERS.get(name, by_plaintext)
         callback(0.1, "Start to parse.")
 

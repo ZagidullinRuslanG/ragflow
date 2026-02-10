@@ -833,6 +833,31 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
             layout_recognizer = "DeepDOC" if layout_recognizer else "Plain Text"
 
         name = layout_recognizer.strip().lower()
+
+        # Custom pdfminer-based parser (Russian-specific layout analysis)
+        _custom_pdfminer_names = {"custom pdfminer", "custompdfminer"}
+        _custom_vision_llm_names = {"custom vision llm", "customvisionllm"}
+        if name in _custom_pdfminer_names:
+            from rag.app.pdf_custom_parser import parse_pdf_pages
+            callback(0.1, "Start to parse (Custom PDFMiner).")
+            custom_res = parse_pdf_pages(
+                filename if not binary else binary, filename, 3,
+                from_page, to_page, parser_config,
+            )
+            callback(0.8, "Finish parsing.")
+            return custom_res
+
+        if name in _custom_vision_llm_names:
+            from rag.app.pdf_custom_parser import parse_pdf_as_images
+            tenant_id = kwargs.get("tenant_id", -1)
+            callback(0.1, "Start to parse (Custom Vision LLM).")
+            custom_res = parse_pdf_as_images(
+                filename if not binary else binary, filename, 3,
+                from_page, to_page, parser_config, tenant_id,
+            )
+            callback(0.8, "Finish parsing.")
+            return custom_res
+
         parser = PARSERS.get(name, by_plaintext)
         callback(0.1, "Start to parse.")
 
