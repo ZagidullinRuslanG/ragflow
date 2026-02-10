@@ -1009,6 +1009,8 @@ class API4Conversation(DataBaseModel):
     dialog_id = CharField(max_length=32, null=False, index=True)
     user_id = CharField(max_length=255, null=False, help_text="user_id", index=True)
     exp_user_id = CharField(max_length=255, null=True, help_text="exp_user_id", index=True)
+    user_name = CharField(max_length=255, null=True, help_text="display name for external users", index=True)
+    is_external = BooleanField(default=False, help_text="true if from embedded widget", index=True)
     message = JSONField(null=True)
     reference = JSONField(null=True, default=[])
     tokens = IntegerField(default=0)

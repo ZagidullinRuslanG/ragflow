@@ -121,5 +121,23 @@ class API4ConversationService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def get_sessions_by_assistant_paginated(cls, dialog_id, page_number=1, items_per_page=20,
+                                            is_external=None, user_name=None, orderby="create_time", desc=True):
+        """Retrieve sessions for a dialog with filtering by is_external and user_name."""
+        sessions = cls.model.select().where(cls.model.dialog_id == dialog_id)
+        if is_external is not None:
+            sessions = sessions.where(cls.model.is_external == is_external)
+        if user_name:
+            sessions = sessions.where(cls.model.user_name.contains(user_name))
+        if desc:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).desc())
+        else:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).asc())
+        count = sessions.count()
+        sessions = sessions.paginate(page_number, items_per_page)
+        return count, list(sessions.dicts())
+
+    @classmethod
+    @DB.connection_context()
     def delete_by_dialog_ids(cls, dialog_ids):
         return cls.model.delete().where(cls.model.dialog_id.in_(dialog_ids)).execute()

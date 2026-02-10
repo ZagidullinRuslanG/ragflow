@@ -918,6 +918,64 @@ Related search terms:
     return get_result(data=[re.sub(r"^[0-9]\. ", "", a) for a in ans.split("\n") if re.match(r"^[0-9]\. ", a)])
 
 
+@manager.route("/chatbots/list", methods=["GET"])  # noqa: F821
+@token_required
+async def list_chatbots(tenant_id):
+    """List available chatbots for the external/embedded chat widget."""
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 30))
+    orderby = request.args.get("orderby", "create_time")
+    desc_str = request.args.get("desc", "true")
+    desc = desc_str.lower() in ("true", "1", "yes")
+    name = request.args.get("name", "")
+
+    try:
+        dialogs = DialogService.get_list(
+            tenant_id, page, page_size, orderby, desc, id=None, name=name
+        )
+        result = []
+        for d in dialogs:
+            result.append({
+                "id": d["id"],
+                "name": d["name"],
+                "description": d.get("description", ""),
+                "icon": d.get("icon", ""),
+                "language": d.get("language", ""),
+                "create_time": d.get("create_time"),
+                "update_time": d.get("update_time"),
+            })
+        return get_result(data=result)
+    except Exception as e:
+        return server_error_response(e)
+
+
+@manager.route("/chatbots/<dialog_id>/sessions", methods=["GET"])  # noqa: F821
+@token_required
+async def list_chatbot_sessions(tenant_id, dialog_id):
+    """List sessions for an embedded chatbot, with optional is_external/user_name filtering."""
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 30))
+    orderby = request.args.get("orderby", "create_time")
+    desc_str = request.args.get("desc", "true")
+    desc = desc_str.lower() in ("true", "1", "yes")
+    is_external = request.args.get("is_external")
+    user_name = request.args.get("user_name", "")
+
+    if is_external is not None:
+        is_external = is_external.lower() in ("true", "1", "yes")
+
+    try:
+        count, sessions = API4ConversationService.get_sessions_by_assistant_paginated(
+            dialog_id, page, page_size, is_external=is_external,
+            user_name=user_name if user_name else None, orderby=orderby, desc=desc
+        )
+        for s in sessions:
+            s["chat_id"] = s.pop("dialog_id", "")
+        return get_result(data={"total": count, "sessions": sessions})
+    except Exception as e:
+        return server_error_response(e)
+
+
 @manager.route("/chatbots/<dialog_id>/completions", methods=["POST"])  # noqa: F821
 async def chatbot_completions(dialog_id):
     req = await get_request_json()
@@ -932,6 +990,9 @@ async def chatbot_completions(dialog_id):
 
     if "quote" not in req:
         req["quote"] = False
+    req["is_external"] = True
+    if "user_name" not in req:
+        req["user_name"] = ""
 
     if req.get("stream", True):
         resp = Response(iframe_completion(dialog_id, **req), mimetype="text/event-stream")

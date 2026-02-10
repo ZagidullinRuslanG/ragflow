@@ -204,6 +204,8 @@ async def async_iframe_completion(dialog_id, question, session_id=None, stream=T
             "id": session_id,
             "dialog_id": dialog_id,
             "user_id": kwargs.get("user_id", ""),
+            "user_name": kwargs.get("user_name", ""),
+            "is_external": kwargs.get("is_external", False),
             "message": [{"role": "assistant", "content": dia.prompt_config["prologue"], "created_at": time.time()}]
         }
         API4ConversationService.save(**conv)
