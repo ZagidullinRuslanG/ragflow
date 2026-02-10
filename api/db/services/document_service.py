@@ -427,15 +427,22 @@ class DocumentService(CommonService):
         page = 0
         page_size = 1000
         while True:
-            chunks = settings.docStoreConn.search(["img_id"], [], {"doc_id": doc.id}, [], OrderByExpr(),
-                                                  page * page_size, page_size, search.index_name(tenant_id),
-                                                  [doc.kb_id])
-            chunk_ids = settings.docStoreConn.get_doc_ids(chunks)
-            if not chunk_ids:
+            raw = settings.docStoreConn.search(["img_id"], [], {"doc_id": doc.id}, [], OrderByExpr(),
+                                               page * page_size, page_size, search.index_name(tenant_id),
+                                               [doc.kb_id])
+            fields = settings.docStoreConn.get_fields(raw, ["img_id"])
+            if not fields:
                 break
-            for cid in chunk_ids:
-                if settings.STORAGE_IMPL.obj_exist(doc.kb_id, cid):
-                    settings.STORAGE_IMPL.rm(doc.kb_id, cid)
+            for chunk_id, fld in fields.items():
+                img_id = fld.get("img_id", "")
+                if not img_id or "-" not in img_id:
+                    continue
+                bucket, obj_name = img_id.split("-", 1)
+                try:
+                    if settings.STORAGE_IMPL.obj_exist(bucket, obj_name):
+                        settings.STORAGE_IMPL.rm(bucket, obj_name)
+                except Exception as e:
+                    logging.warning(f"Failed to delete image {img_id} for chunk {chunk_id}: {e}")
             page += 1
 
     @classmethod
