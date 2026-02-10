@@ -47,6 +47,43 @@ from common.string_utils import remove_redundant_spaces
 from common import settings
 
 
+def _reindex_image_tags(content: str) -> tuple[str, dict]:
+    """Replace repeated base64 image hashes with short [IMG_N] placeholders.
+
+    This significantly reduces token usage when chunks contain inline images
+    with long base64-encoded data URIs.
+
+    Returns:
+        (modified_content, mapping) where mapping is {placeholder: original_hash}
+    """
+    pattern = re.compile(r"(!\[[^\]]*\]\(data:image/[^;]+;base64,)([A-Za-z0-9+/=]{100,})(\))")
+    seen = {}
+    counter = [0]
+    mapping = {}
+
+    def _replace(m):
+        prefix, b64hash, suffix = m.group(1), m.group(2), m.group(3)
+        if b64hash not in seen:
+            counter[0] += 1
+            placeholder = f"IMG_{counter[0]}"
+            seen[b64hash] = placeholder
+            mapping[placeholder] = b64hash
+        return f"[{seen[b64hash]}]"
+
+    result = pattern.sub(_replace, content)
+    return result, mapping
+
+
+def _restore_image_tags(answer: str, mapping: dict) -> str:
+    """Restore [IMG_N] placeholders back to original base64 image markdown."""
+    for placeholder, b64hash in mapping.items():
+        answer = answer.replace(
+            f"[{placeholder}]",
+            f"![image](data:image/png;base64,{b64hash})"
+        )
+    return answer
+
+
 class DialogService(CommonService):
     model = Dialog
 
@@ -475,7 +512,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
     gen_conf = dialog.llm_setting
 
-    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)+attachments_}]
+    system_content = prompt_config["system"].format(**kwargs) + attachments_
+    system_content, img_mapping = _reindex_image_tags(system_content)
+    msg = [{"role": "system", "content": system_content}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
@@ -489,6 +528,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
 
     def decorate_answer(answer):
         nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer
+
+        if img_mapping:
+            answer = _restore_image_tags(answer, img_mapping)
 
         refs = []
         ans = answer.split("</think>")
