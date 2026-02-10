@@ -246,12 +246,23 @@ async def async_chat_solo(dialog, messages, stream=True):
     acyclic_conf = get_additional_conf(dialog)
     if stream:
         stream_iter = chat_mdl.async_chat_streamly_delta(prompt_config.get("system", ""), msg, dialog.llm_setting, additional_conf=acyclic_conf)
+        stream_start_ts = timer()
+        first_token_ts = None
+        token_count = 0
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             if kind == "marker":
                 flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
                 yield {"answer": "", "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time(), "final": False, **flags}
                 continue
+            if first_token_ts is None:
+                first_token_ts = timer()
+            token_count += max(1, len(value.split()))
             yield {"answer": value, "reference": {}, "audio_binary": tts(tts_mdl, value), "prompt": "", "created_at": time.time(), "final": False}
+        stream_end_ts = timer()
+        ttft_ms = (first_token_ts - stream_start_ts) * 1000 if first_token_ts else 0
+        elapsed = stream_end_ts - (first_token_ts or stream_start_ts)
+        tps = token_count / elapsed if elapsed > 0 else 0
+        yield {"answer": "", "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time(), "final": True, "metrics": {"ttft_ms": round(ttft_ms, 1), "tps": round(tps, 1)}}
     else:
         answer = await chat_mdl.async_chat(prompt_config.get("system", ""), msg, dialog.llm_setting, additional_conf=acyclic_conf)
         user_content = msg[-1].get("content", "[content not available]")
@@ -629,12 +640,18 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     if stream:
         stream_iter = chat_mdl.async_chat_streamly_delta(prompt + prompt4citation, msg[1:], gen_conf, additional_conf=acyclic_conf)
         last_state = None
+        stream_start_ts = timer()
+        first_token_ts = None
+        token_count = 0
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             last_state = state
             if kind == "marker":
                 flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
                 yield {"answer": "", "reference": {}, "audio_binary": None, "final": False, **flags}
                 continue
+            if first_token_ts is None:
+                first_token_ts = timer()
+            token_count += max(1, len(value.split()))
             yield {"answer": value, "reference": {}, "audio_binary": tts(tts_mdl, value), "final": False}
         full_answer = last_state.full_text if last_state else ""
         if full_answer:
@@ -642,6 +659,11 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             final["final"] = True
             final["audio_binary"] = None
             final["answer"] = ""
+            stream_end_ts = timer()
+            ttft_ms = (first_token_ts - stream_start_ts) * 1000 if first_token_ts else 0
+            elapsed = stream_end_ts - (first_token_ts or stream_start_ts)
+            tps = token_count / elapsed if elapsed > 0 else 0
+            final["metrics"] = {"ttft_ms": round(ttft_ms, 1), "tps": round(tps, 1)}
             yield final
     else:
         answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf, additional_conf=acyclic_conf)
@@ -1222,17 +1244,28 @@ async def async_ask(question, kb_ids, tenant_id, chat_llm_name=None, search_conf
 
     stream_iter = chat_mdl.async_chat_streamly_delta(sys_prompt, msg, {"temperature": 0.1})
     last_state = None
+    stream_start_ts = timer()
+    first_token_ts = None
+    token_count = 0
     async for kind, value, state in _stream_with_think_delta(stream_iter):
         last_state = state
         if kind == "marker":
             flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
             yield {"answer": "", "reference": {}, "final": False, **flags}
             continue
+        if first_token_ts is None:
+            first_token_ts = timer()
+        token_count += max(1, len(value.split()))
         yield {"answer": value, "reference": {}, "final": False}
     full_answer = last_state.full_text if last_state else ""
     final = decorate_answer(full_answer)
     final["final"] = True
     final["answer"] = ""
+    stream_end_ts = timer()
+    ttft_ms = (first_token_ts - stream_start_ts) * 1000 if first_token_ts else 0
+    elapsed = stream_end_ts - (first_token_ts or stream_start_ts)
+    tps = token_count / elapsed if elapsed > 0 else 0
+    final["metrics"] = {"ttft_ms": round(ttft_ms, 1), "tps": round(tps, 1)}
     yield final
 
 

@@ -152,6 +152,7 @@ export interface IAnswer {
   audio_binary?: string;
   data?: any;
   chatBoxId?: string;
+  metrics?: { ttft_ms: number; tps: number };
 }
 
 export interface Docagg {

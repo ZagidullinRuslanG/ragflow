@@ -40,7 +40,9 @@ import { ReferenceImageList } from './reference-image-list';
 import { UploadedMessageFiles } from './uploaded-message-files';
 
 interface IProps
-  extends Partial<IRemoveMessageById>, IRegenerateMessage, PropsWithChildren {
+  extends Partial<IRemoveMessageById>,
+    IRegenerateMessage,
+    PropsWithChildren {
   item: IMessage;
   conversationId?: string;
   currentEventListWithoutMessageById?: (messageId: string) => INodeEvent[];
@@ -309,6 +311,13 @@ function MessageItem({
               <ReferenceDocumentList
                 list={referenceDocuments}
               ></ReferenceDocumentList>
+            )}
+
+            {isAssistant && (item as any).metrics && (
+              <div className="flex gap-2 text-xs text-text-secondary mt-1">
+                <span>TTFT: {(item as any).metrics.ttft_ms}ms</span>
+                <span>TPS: {(item as any).metrics.tps}</span>
+              </div>
             )}
 
             {isUser && (
