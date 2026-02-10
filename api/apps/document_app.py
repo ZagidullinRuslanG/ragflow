@@ -924,6 +924,52 @@ async def set_meta():
         return server_error_response(e)
 
 
+@manager.route("/set_parser_configs_for_docs", methods=["POST"])  # noqa: F821
+@login_required
+@validate_request("parser_configs")
+async def set_parser_configs_for_docs():
+    """Bulk update parser_config for multiple documents in a knowledge base."""
+    req = await request.json
+    kb_id = req.get("kb_id")
+    parser_configs = req.get("parser_configs", {})
+
+    if not kb_id:
+        return get_data_error_result(message="kb_id is required")
+    if not parser_configs:
+        return get_data_error_result(message="parser_configs is required and must not be empty")
+
+    try:
+        names = list(parser_configs.keys())
+        docs = DocumentService.get_doc_ids_by_doc_names(names)
+
+        errors = {}
+        updated = 0
+
+        for name, config in parser_configs.items():
+            matching = [d for d in docs if d.name == name and d.kb_id == kb_id]
+            if not matching:
+                errors[name] = "Document not found in this knowledge base"
+                continue
+            if len(matching) > 1:
+                errors[name] = f"Ambiguous: {len(matching)} documents with same name"
+                continue
+            doc = matching[0]
+            if not DocumentService.accessible(doc.id, current_user.id):
+                errors[name] = "Access denied"
+                continue
+            new_parser_config = config.get("parser_config", config)
+            if not DocumentService.update_by_id(doc.id, {"parser_config": new_parser_config}):
+                errors[name] = "Failed to update"
+                continue
+            updated += 1
+
+        if errors:
+            return get_json_result(data={"updated": updated, "errors": errors})
+        return get_json_result(data=f"Successfully updated {updated} file(s)")
+    except Exception as e:
+        return server_error_response(e)
+
+
 @manager.route("/upload_info", methods=["POST"])  # noqa: F821
 async def upload_info():
     files = await request.files
