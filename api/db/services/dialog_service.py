@@ -84,6 +84,17 @@ def _restore_image_tags(answer: str, mapping: dict) -> str:
     return answer
 
 
+def _enrich_chunks_with_image_urls(refs: dict) -> dict:
+    """Add image_url field to chunks that have img_id for frontend rendering."""
+    if not refs or "chunks" not in refs:
+        return refs
+    for chunk in refs["chunks"]:
+        img_id = chunk.get("img_id", "")
+        if img_id and "-" in img_id:
+            chunk["image_url"] = f"/v1/document/image/{img_id}"
+    return refs
+
+
 class DialogService(CommonService):
     model = Dialog
 
@@ -568,6 +579,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             for c in refs["chunks"]:
                 if c.get("vector"):
                     del c["vector"]
+            refs = _enrich_chunks_with_image_urls(refs)
 
         if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
             answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
@@ -1201,6 +1213,7 @@ async def async_ask(question, kb_ids, tenant_id, chat_llm_name=None, search_conf
         for c in refs["chunks"]:
             if c.get("vector"):
                 del c["vector"]
+        refs = _enrich_chunks_with_image_urls(refs)
 
         if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
             answer += " Please set LLM API-Key in 'User Setting -> Model Providers -> API-Key'"
