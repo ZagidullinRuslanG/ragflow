@@ -138,6 +138,7 @@ async def run():
     files = req.get("files", [])
     inputs = req.get("inputs", {})
     user_id = req.get("user_id", current_user.id)
+    session_id = req.get("session_id")
     if not await thread_pool_exec(UserCanvasService.accessible, req["id"], current_user.id):
         return get_json_result(
             data=False, message='Only owner of canvas authorized for this operation.',
@@ -158,19 +159,57 @@ async def run():
             return get_data_error_result(message=error_message)
         return get_json_result(data={"message_id": task_id})
 
+    # Session persistence: create or load conversation
+    conv = None
+    if not session_id:
+        session_id = get_uuid()
+    else:
+        try:
+            e, conv = API4ConversationService.get_by_id(session_id)
+            if not e:
+                conv = None
+        except Exception:
+            conv = None
+
+    if conv is None:
+        conv_data = {
+            "id": session_id,
+            "dialog_id": req["id"],
+            "user_id": user_id,
+            "message": [],
+            "source": "agent",
+            "dsl": cvs.dsl,
+            "reference": [],
+        }
+        API4ConversationService.save(**conv_data)
+        e, conv = API4ConversationService.get_by_id(session_id)
+
+    if query:
+        if not conv.message:
+            conv.message = []
+        conv.message.append({"role": "user", "content": query, "created_at": time.time()})
+
     try:
         canvas = Canvas(cvs.dsl, current_user.id, canvas_id=cvs.id)
     except Exception as e:
         return server_error_response(e)
 
     async def sse():
-        nonlocal canvas, user_id
+        nonlocal canvas, user_id, conv
+        full_answer = ""
         try:
             async for ans in canvas.run(query=query, files=files, user_id=user_id, inputs=inputs):
+                ans["session_id"] = session_id
+                if ans.get("running_status"):
+                    full_answer = ans.get("content", full_answer)
                 yield "data:" + json.dumps(ans, ensure_ascii=False) + "\n\n"
 
             cvs.dsl = json.loads(str(canvas))
             UserCanvasService.update_by_id(req["id"], cvs.to_dict())
+
+            if full_answer and conv:
+                conv.message.append({"role": "assistant", "content": full_answer, "created_at": time.time()})
+                API4ConversationService.append_message(conv.id, conv.to_dict())
 
         except Exception as e:
             logging.exception(e)
