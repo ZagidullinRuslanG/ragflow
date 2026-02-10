@@ -112,6 +112,7 @@ async def set_dialog():
                 "tenant_id": current_user.id,
                 "name": name,
                 "kb_ids": req.get("kb_ids", []),
+                "kb_ids_sec": req.get("kb_ids_sec", []),
                 "description": description,
                 "llm_id": llm_id,
                 "llm_setting": llm_setting,
@@ -122,7 +123,17 @@ async def set_dialog():
                 "rerank_id": rerank_id,
                 "similarity_threshold": similarity_threshold,
                 "vector_similarity_weight": vector_similarity_weight,
-                "icon": icon
+                "icon": icon,
+                "model_context_const_size": req.get("model_context_const_size", 0),
+                "retries_count": req.get("retries_count", 0),
+                "retry_temp_shift": req.get("retry_temp_shift", ""),
+                "retry_timeout_shift": req.get("retry_timeout_shift", ""),
+                "show_retries": req.get("show_retries", False),
+                "loop_min_chars": req.get("loop_min_chars", 50),
+                "loop_thresh": req.get("loop_thresh", 3),
+                "prompt_suffix_on_retry": req.get("prompt_suffix_on_retry", ""),
+                "check_every_n": req.get("check_every_n", 8),
+                "show_thinking": req.get("show_thinking", False),
             }
             if not DialogService.save(**dia):
                 return get_data_error_result(message="Fail to new a dialog!")

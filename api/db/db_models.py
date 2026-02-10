@@ -959,6 +959,20 @@ class Dialog(DataBaseModel):
     rerank_id = CharField(max_length=128, null=False, help_text="default rerank model ID")
 
     kb_ids = JSONField(null=False, default=[])
+    kb_ids_sec = JSONField(null=False, default=[], help_text="secondary knowledge base IDs")
+
+    # Acyclic (loopless) client configuration
+    model_context_const_size = IntegerField(default=0, help_text="constant context window size, 0 = dynamic")
+    retries_count = IntegerField(default=0, help_text="number of retries on loop detection")
+    retry_temp_shift = CharField(max_length=255, null=True, default="", help_text="comma-separated temperature shifts for retries")
+    retry_timeout_shift = CharField(max_length=255, null=True, default="", help_text="comma-separated timeout shifts for retries")
+    show_retries = BooleanField(default=False, help_text="show failed attempts in response")
+    loop_min_chars = IntegerField(default=50, help_text="min chars for loop detection")
+    loop_thresh = IntegerField(default=3, help_text="max repetitions before loop is detected")
+    prompt_suffix_on_retry = CharField(max_length=1024, null=True, default="", help_text="suffix added to prompt on retry")
+    check_every_n = IntegerField(default=8, help_text="check for loops every N tokens")
+    show_thinking = BooleanField(default=False, help_text="show thinking/reasoning in chat")
+
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
 
     class Meta:

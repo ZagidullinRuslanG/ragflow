@@ -195,8 +195,9 @@ async def async_chat_solo(dialog, messages, stream=True):
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     if attachments and msg:
         msg[-1]["content"] += attachments
+    acyclic_conf = get_additional_conf(dialog)
     if stream:
-        stream_iter = chat_mdl.async_chat_streamly_delta(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        stream_iter = chat_mdl.async_chat_streamly_delta(prompt_config.get("system", ""), msg, dialog.llm_setting, additional_conf=acyclic_conf)
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             if kind == "marker":
                 flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
@@ -204,10 +205,26 @@ async def async_chat_solo(dialog, messages, stream=True):
                 continue
             yield {"answer": value, "reference": {}, "audio_binary": tts(tts_mdl, value), "prompt": "", "created_at": time.time(), "final": False}
     else:
-        answer = await chat_mdl.async_chat(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        answer = await chat_mdl.async_chat(prompt_config.get("system", ""), msg, dialog.llm_setting, additional_conf=acyclic_conf)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+
+
+def get_additional_conf(dialog):
+    """Extract acyclic/loopless client configuration from dialog model."""
+    return {
+        "model_context_const_size": getattr(dialog, "model_context_const_size", 0),
+        "retries_count": getattr(dialog, "retries_count", 0),
+        "retry_temp_shift": getattr(dialog, "retry_temp_shift", ""),
+        "retry_timeout_shift": getattr(dialog, "retry_timeout_shift", ""),
+        "show_retries": getattr(dialog, "show_retries", False),
+        "loop_min_chars": getattr(dialog, "loop_min_chars", 50),
+        "loop_thresh": getattr(dialog, "loop_thresh", 3),
+        "prompt_suffix_on_retry": getattr(dialog, "prompt_suffix_on_retry", ""),
+        "check_every_n": getattr(dialog, "check_every_n", 8),
+        "show_thinking": getattr(dialog, "show_thinking", False),
+    }
 
 
 def get_models(dialog):
@@ -554,8 +571,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             input={"prompt": prompt, "prompt4citation": prompt4citation, "messages": msg}
         )
 
+    acyclic_conf = get_additional_conf(dialog)
     if stream:
-        stream_iter = chat_mdl.async_chat_streamly_delta(prompt + prompt4citation, msg[1:], gen_conf)
+        stream_iter = chat_mdl.async_chat_streamly_delta(prompt + prompt4citation, msg[1:], gen_conf, additional_conf=acyclic_conf)
         last_state = None
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             last_state = state
@@ -572,7 +590,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             final["answer"] = ""
             yield final
     else:
-        answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf)
+        answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf, additional_conf=acyclic_conf)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)

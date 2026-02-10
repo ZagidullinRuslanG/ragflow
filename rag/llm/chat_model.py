@@ -892,6 +892,36 @@ class OllamaChat(Base):
             yield _format_with_failed_attempts(ans, failed_attempts, conf["show_retries"]) + "\n**ERROR**: " + str(e)
         yield token_count
 
+    async def async_chat(self, system, history, gen_conf={}, **kwargs):
+        """Bridge sync chat to async via thread pool."""
+        txt, tokens = await thread_pool_exec(self.chat, system, history, gen_conf, kwargs.get("additional_conf"))
+        return txt, tokens
+
+    async def async_chat_streamly(self, system, history, gen_conf={}, **kwargs):
+        """Bridge sync chat_streamly to async via thread pool queue."""
+        import queue as _queue
+        result_queue: _queue.Queue = _queue.Queue()
+
+        def _run():
+            try:
+                for item in self.chat_streamly(system, history, gen_conf, kwargs.get("additional_conf")):
+                    result_queue.put(item)
+            except Exception as exc:
+                result_queue.put(exc)
+            finally:
+                result_queue.put(StopIteration)
+
+        import threading
+        threading.Thread(target=_run, daemon=True).start()
+
+        while True:
+            item = await asyncio.get_event_loop().run_in_executor(None, result_queue.get)
+            if item is StopIteration:
+                break
+            if isinstance(item, Exception):
+                raise item
+            yield item
+
 
 class LocalAIChat(Base):
     _FACTORY_NAME = "LocalAI"
