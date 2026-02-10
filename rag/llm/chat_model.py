@@ -725,10 +725,14 @@ class OllamaChat(Base):
         return options
 
     def _calculate_dynamic_ctx(self, history):
-        """Calculate dynamic context size based on message content."""
+        """Calculate dynamic context size based on message content.
+
+        Uses a minimum of 32000 tokens to ensure reliable operation with
+        Ollama models that may have different default context sizes.
+        """
         total_chars = sum(len(str(m.get("content", ""))) for m in history)
         estimated_tokens = total_chars // 3
-        return max(8192, estimated_tokens * 2)
+        return max(32000, estimated_tokens * 2)
 
     def _chat(self, history, gen_conf={}, **kwargs):
         options = self._clean_conf(gen_conf)
