@@ -11,6 +11,7 @@ const {
   setConversation,
   completeConversation,
   listConversation,
+  listExternalSessions,
   removeConversation,
   createToken,
   listToken,
@@ -50,6 +51,10 @@ const methods = {
   },
   listConversation: {
     url: listConversation,
+    method: 'get',
+  },
+  listExternalSessions: {
+    url: listExternalSessions,
     method: 'get',
   },
   getConversation: {

@@ -47,6 +47,7 @@ export const enum ChatApiAction {
   Feedback = 'feedback',
   CreateSharedConversation = 'createSharedConversation',
   FetchConversationSse = 'fetchConversationSSE',
+  FetchExternalSessions = 'fetchExternalSessions',
 }
 
 export const useGetChatSearchParams = () => {
@@ -230,6 +231,50 @@ export const useFetchConversationList = () => {
   });
 
   return { data, loading, refetch, searchString, handleInputChange };
+};
+
+export const useFetchExternalSessions = () => {
+  const { id } = useParams();
+
+  const { searchString, handleInputChange } = useHandleSearchStrChange();
+
+  const {
+    data,
+    isFetching: loading,
+    refetch,
+  } = useQuery<{ total: number; sessions: IConversation[] }>({
+    queryKey: [ChatApiAction.FetchExternalSessions, id],
+    initialData: { total: 0, sessions: [] },
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    enabled: !!id,
+    select(data) {
+      const sessions = searchString
+        ? data.sessions.filter(
+            (x) =>
+              (x.name ?? '').includes(searchString) ||
+              (x.user_name ?? '').includes(searchString),
+          )
+        : data.sessions;
+      return { ...data, sessions };
+    },
+    queryFn: async () => {
+      const { data } = await chatService.listExternalSessions(
+        { params: { dialog_id: id, page_size: 100 } },
+        true,
+      );
+      return data?.data ?? { total: 0, sessions: [] };
+    },
+  });
+
+  return {
+    data: data.sessions,
+    total: data.total,
+    loading,
+    refetch,
+    searchString,
+    handleInputChange,
+  };
 };
 
 export function useFetchConversationManually() {

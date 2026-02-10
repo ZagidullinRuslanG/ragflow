@@ -22,6 +22,7 @@ import tempfile
 from quart import Response, request
 from api.apps import current_user, login_required
 from api.db.db_models import APIToken
+from api.db.services.api_service import API4ConversationService
 from api.db.services.conversation_service import ConversationService, structure_answer
 from api.db.services.dialog_service import DialogService, async_ask, async_chat, gen_mindmap
 from api.db.services.llm_service import LLMBundle
@@ -161,6 +162,28 @@ async def list_conversation():
 
         convs = [d.to_dict() for d in convs]
         return get_json_result(data=convs)
+    except Exception as e:
+        return server_error_response(e)
+
+
+@manager.route("/external_list", methods=["GET"])  # noqa: F821
+@login_required
+async def list_external_sessions():
+    """List external (embedded widget) sessions for a dialog."""
+    dialog_id = request.args.get("dialog_id", "")
+    if not dialog_id:
+        return get_data_error_result(message="dialog_id is required")
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 30))
+    user_name = request.args.get("user_name", "")
+    try:
+        if not DialogService.query(tenant_id=current_user.id, id=dialog_id):
+            return get_json_result(data=False, message="Only owner of dialog authorized for this operation.", code=RetCode.OPERATING_ERROR)
+        count, sessions = API4ConversationService.get_sessions_by_assistant_paginated(
+            dialog_id, page, page_size, is_external=True,
+            user_name=user_name if user_name else None
+        )
+        return get_json_result(data={"total": count, "sessions": sessions})
     except Exception as e:
         return server_error_response(e)
 

@@ -730,6 +730,7 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       multipleModels: 'Multiple models',
       applyModelConfigs: 'Apply model configs',
       conversations: 'Conversations',
+      externalSessions: 'External',
       chatApps: 'Chat apps',
       newConversation: 'New conversation',
       createAssistant: 'Create an assistant',

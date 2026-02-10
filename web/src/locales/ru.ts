@@ -562,6 +562,7 @@ export default {
       multipleModels: 'Несколько моделей',
       applyModelConfigs: 'Применить настройки моделей',
       conversations: 'Диалоги',
+      externalSessions: 'Внешние',
       chatApps: 'Чат-приложения',
       newConversation: 'Новый диалог',
       createAssistant: 'Создать ассистента',

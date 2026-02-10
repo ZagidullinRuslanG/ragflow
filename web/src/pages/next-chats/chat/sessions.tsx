@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SearchInput } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSetModalState } from '@/hooks/common-hooks';
 import {
   useFetchDialog,
+  useFetchExternalSessions,
   useGetChatSearchParams,
   useRemoveConversation,
 } from '@/hooks/use-chat-request';
@@ -18,6 +20,8 @@ import { useTranslation } from 'react-i18next';
 import { useHandleClickConversationCard } from '../hooks/use-click-card';
 import { useSelectDerivedConversationList } from '../hooks/use-select-conversation-list';
 import { ConversationDropdown } from './conversation-dropdown';
+
+type SessionTab = 'internal' | 'external';
 
 type SessionProps = Pick<
   ReturnType<typeof useHandleClickConversationCard>,
@@ -35,6 +39,15 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
   const { data } = useFetchDialog();
   const { visible, switchVisible } = useSetModalState(true);
   const { removeConversation } = useRemoveConversation();
+
+  const [activeTab, setActiveTab] = useState<SessionTab>('internal');
+
+  // External sessions
+  const {
+    data: externalSessions,
+    handleInputChange: handleExternalSearchChange,
+    searchString: externalSearchString,
+  } = useFetchExternalSessions();
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -103,6 +116,12 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
 
   const { conversationId } = useGetChatSearchParams();
 
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value as SessionTab);
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
   if (!visible) {
     return (
       <div className="p-5">
@@ -115,6 +134,9 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
       </div>
     );
   }
+
+  const isInternal = activeTab === 'internal';
+  const displayList = isInternal ? conversationList : externalSessions;
 
   return (
     <section className="p-5 w-[296px] flex flex-col">
@@ -132,90 +154,107 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
           onClick={switchVisible}
         />
       </section>
-      <div className="flex justify-between items-center mb-4 pt-10">
-        <div className="flex items-center gap-3">
-          <span className="text-base font-bold">{t('chat.conversations')}</span>
-          <span className="text-text-secondary text-xs">
-            {conversationList.length}
-          </span>
-        </div>
-        {selectionMode && selectedCount > 0 ? (
-          // Selection mode with items selected: show return and delete
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              onClick={exitSelectionMode}
-            >
-              <img src="/return2.png" alt="返回" className="h-4 w-4" />
-            </Button>
-            <ConfirmDeleteDialog
-              onOk={handleBatchDelete}
-              title={t('chat.batchDeleteSessions')}
-              content={{
-                title: t('chat.deleteSelectedConfirm', {
-                  count: selectedCount,
-                }),
-              }}
-            >
+
+      <div className="pt-6 pb-2">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="w-full">
+            <TabsTrigger value="internal" className="flex-1 text-xs">
+              {t('chat.conversations')}
+              <span className="ml-1 text-text-secondary">
+                {conversationList.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="external" className="flex-1 text-xs">
+              {t('chat.externalSessions', { defaultValue: 'External' })}
+              <span className="ml-1 text-text-secondary">
+                {externalSessions.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {isInternal && (
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3"></div>
+          {selectionMode && selectedCount > 0 ? (
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-6 text-state-error"
+                className="size-6"
+                onClick={exitSelectionMode}
               >
-                <Trash2 className="h-4 w-4" />
+                <img src="/return2.png" alt="back" className="h-4 w-4" />
               </Button>
-            </ConfirmDeleteDialog>
-          </div>
-        ) : (
-          // Default or selection mode without selection: show plus and batch delete
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              onClick={addTemporaryConversation}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6"
-              onClick={selectionMode ? toggleSelectAll : toggleSelectionMode}
-            >
-              {selectionMode && allSelected ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <img
-                  src="/batch_delete2.png"
-                  alt="批量删除"
-                  className="h-4 w-4"
-                />
-              )}
-            </Button>
-          </div>
-        )}
-      </div>
+              <ConfirmDeleteDialog
+                onOk={handleBatchDelete}
+                title={t('chat.batchDeleteSessions')}
+                content={{
+                  title: t('chat.deleteSelectedConfirm', {
+                    count: selectedCount,
+                  }),
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-state-error"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </ConfirmDeleteDialog>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                onClick={addTemporaryConversation}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                onClick={selectionMode ? toggleSelectAll : toggleSelectionMode}
+              >
+                {selectionMode && allSelected ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <img
+                    src="/batch_delete2.png"
+                    alt="batch delete"
+                    className="h-4 w-4"
+                  />
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="pb-4">
         <SearchInput
-          onChange={handleInputChange}
-          value={searchString}
+          onChange={isInternal ? handleInputChange : handleExternalSearchChange}
+          value={isInternal ? searchString : externalSearchString}
         ></SearchInput>
       </div>
       <div className="space-y-4 flex-1 overflow-auto">
-        {conversationList.map((x) => (
+        {displayList.map((x) => (
           <Card
             key={x.id}
-            onClick={handleCardClick(x.id, x.is_new)}
+            onClick={isInternal ? handleCardClick(x.id, x.is_new) : undefined}
             className={cn('cursor-pointer bg-transparent relative', {
               'bg-bg-card': conversationId === x.id && !selectionMode,
+              'cursor-default': !isInternal,
             })}
           >
             <CardContent className="px-3 py-2 flex justify-between items-center group gap-1">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                {selectionMode && (
+                {isInternal && selectionMode && (
                   <span
                     className="flex-shrink-0"
                     onClick={(e) => e.stopPropagation()}
@@ -227,9 +266,16 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
                     />
                   </span>
                 )}
-                <div className="truncate">{x.name}</div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="truncate">{x.name}</div>
+                  {!isInternal && x.user_name && (
+                    <div className="text-xs text-text-secondary truncate">
+                      {x.user_name}
+                    </div>
+                  )}
+                </div>
               </div>
-              {!selectionMode && (
+              {isInternal && !selectionMode && (
                 <ConversationDropdown
                   conversation={x}
                   removeTemporaryConversation={removeTemporaryConversation}

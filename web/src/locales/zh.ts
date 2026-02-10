@@ -675,6 +675,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       multipleModels: '多模型',
       applyModelConfigs: '应用模型配置',
       conversations: '会话',
+      externalSessions: '外部会话',
       chatApps: '聊天',
       createChat: '创建聊天',
       newConversation: '新会话',

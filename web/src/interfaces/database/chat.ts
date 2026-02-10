@@ -99,6 +99,8 @@ export interface IConversation {
   update_date: string;
   update_time: number;
   is_new: true;
+  user_name?: string;
+  is_external?: boolean;
 }
 
 export interface Message {

@@ -130,6 +130,7 @@ export default {
   getConversationSSE: (dialogId: string) =>
     `${api_host}/conversation/getsse/${dialogId}`,
   listConversation: `${api_host}/conversation/list`,
+  listExternalSessions: `${api_host}/conversation/external_list`,
   removeConversation: `${api_host}/conversation/rm`,
   completeConversation: `${api_host}/conversation/completion`,
   deleteMessage: `${api_host}/conversation/delete_msg`,
