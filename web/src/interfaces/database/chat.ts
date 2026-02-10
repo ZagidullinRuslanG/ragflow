@@ -123,6 +123,7 @@ export interface IReferenceChunk {
   document_name: string;
   dataset_id: string;
   image_id: string;
+  image_url?: string;
   similarity: number;
   vector_similarity: number;
   term_similarity: number;
