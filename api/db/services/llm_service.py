@@ -82,6 +82,71 @@ def get_init_tenant_llm(user_id):
     return list(unique.values())
 
 
+def configure_default_llm_models(tenant_id):
+    """Auto-configure tenant LLM settings from environment variables.
+
+    Reads DEFAULT_LLM_FACTORY, DEFAULT_LLM_API_KEY, DEFAULT_LLM_BASE_URL,
+    DEFAULT_CHAT_MODEL, DEFAULT_EMBED_MODEL, DEFAULT_RERANK_MODEL env vars
+    and configures the tenant's model providers accordingly.
+    This eliminates the manual 'Model Providers' setup step for self-hosted deployments.
+
+    Returns True if any models were configured, False otherwise.
+    """
+    import os
+
+    factory = os.environ.get("DEFAULT_LLM_FACTORY", "").strip()
+    api_key = os.environ.get("DEFAULT_LLM_API_KEY", "").strip()
+    base_url = os.environ.get("DEFAULT_LLM_BASE_URL", "").strip()
+    chat_model = os.environ.get("DEFAULT_CHAT_MODEL", "").strip()
+    embed_model = os.environ.get("DEFAULT_EMBED_MODEL", "").strip()
+    rerank_model = os.environ.get("DEFAULT_RERANK_MODEL", "").strip()
+
+    if not factory:
+        return False
+
+    models_to_add = []
+    if chat_model:
+        models_to_add.append({
+            "tenant_id": tenant_id,
+            "llm_factory": factory,
+            "llm_name": chat_model,
+            "model_type": LLMType.CHAT.value,
+            "api_key": api_key or "x",
+            "api_base": base_url,
+            "max_tokens": 8192,
+        })
+    if embed_model:
+        models_to_add.append({
+            "tenant_id": tenant_id,
+            "llm_factory": factory,
+            "llm_name": embed_model,
+            "model_type": LLMType.EMBEDDING.value,
+            "api_key": api_key or "x",
+            "api_base": base_url,
+            "max_tokens": 8192,
+        })
+    if rerank_model:
+        models_to_add.append({
+            "tenant_id": tenant_id,
+            "llm_factory": factory,
+            "llm_name": rerank_model,
+            "model_type": LLMType.RERANK.value,
+            "api_key": api_key or "x",
+            "api_base": base_url,
+            "max_tokens": 8192,
+        })
+
+    if models_to_add:
+        try:
+            TenantLLMService.insert_many(models_to_add)
+            logging.info(f"Auto-configured {len(models_to_add)} LLM model(s) for tenant {tenant_id} "
+                         f"(factory={factory})")
+        except Exception as e:
+            logging.warning(f"Failed to auto-configure LLM models for tenant {tenant_id}: {e}")
+        return True
+    return False
+
+
 class LLMBundle(LLM4Tenant):
     def __init__(self, tenant_id, llm_type, llm_name=None, lang="Chinese", **kwargs):
         super().__init__(tenant_id, llm_type, llm_name, lang, **kwargs)

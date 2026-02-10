@@ -30,7 +30,7 @@ from api.apps.auth import get_auth_client
 from api.db import FileType, UserTenantRole
 from api.db.db_models import TenantLLM
 from api.db.services.file_service import FileService
-from api.db.services.llm_service import get_init_tenant_llm
+from api.db.services.llm_service import configure_default_llm_models, get_init_tenant_llm
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserService, UserTenantService
 from common.time_utils import current_timestamp, datetime_format, get_format_time
@@ -662,6 +662,7 @@ def user_register(user_id, user):
     TenantService.insert(**tenant)
     UserTenantService.insert(**usr_tenant)
     TenantLLMService.insert_many(tenant_llm)
+    configure_default_llm_models(user_id)
     FileService.insert(file)
     return UserService.query(email=user["email"])
 
