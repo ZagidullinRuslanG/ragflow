@@ -692,6 +692,7 @@ export const RestrictedUpstreamMap = {
   [Operator.Loop]: [Operator.Begin],
   [Operator.LoopStart]: [Operator.Begin],
   [Operator.ExitLoop]: [Operator.Begin],
+  [Operator.Answer2]: [Operator.Begin],
 };
 
 export const NodeMap = {
@@ -743,6 +744,7 @@ export const NodeMap = {
   [Operator.ExitLoop]: 'exitLoopNode',
   [Operator.ExcelProcessor]: 'ragNode',
   [Operator.PDFGenerator]: 'ragNode',
+  [Operator.Answer2]: 'ragNode',
 };
 
 export enum BeginQueryType {
@@ -1020,6 +1022,16 @@ export const initialPDFGeneratorValues = {
     pdf_base64: { type: 'string' },
     download: { type: 'string' },
     success: { type: 'boolean' },
+  },
+};
+
+export const initialAnswer2Values = {
+  kb_ids: [],
+  outputs: {
+    content: {
+      value: '',
+      type: 'string',
+    },
   },
 };
 

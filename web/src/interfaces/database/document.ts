@@ -58,6 +58,7 @@ export interface IParserConfig {
     enum?: string[];
   }>;
   enable_metadata?: boolean;
+  additional_parsing_info?: string;
 }
 
 interface Raptor {

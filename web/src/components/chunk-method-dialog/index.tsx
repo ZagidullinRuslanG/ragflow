@@ -33,6 +33,7 @@ import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { AdditionalParsingInfoFormField } from '../additional-parsing-info-form-field';
 import {
   AutoKeywordsFormField,
   AutoQuestionsFormField,
@@ -57,10 +58,11 @@ import {
 
 const FormId = 'ChunkMethodDialogForm';
 
-interface IProps extends IModalProps<{
-  parserId: string;
-  parserConfig: IChangeParserConfigRequestBody;
-}> {
+interface IProps
+  extends IModalProps<{
+    parserId: string;
+    parserConfig: IChangeParserConfigRequestBody;
+  }> {
   loading: boolean;
   parserId: string;
   pipelineId?: string;
@@ -154,6 +156,7 @@ export function ChunkMethodDialog({
           )
           .optional(),
         enable_metadata: z.boolean().optional(),
+        additional_parsing_info: z.string().optional(),
       }),
     })
     .superRefine((data, ctx) => {
@@ -407,6 +410,7 @@ export function ChunkMethodDialog({
                   {showExcelToHtml && (
                     <ExcelToHtmlFormField></ExcelToHtmlFormField>
                   )}
+                  <AdditionalParsingInfoFormField />
                 </FormContainer>
                 {/* {showRaptorParseConfiguration(
                   selectedTag as DocumentParserType,

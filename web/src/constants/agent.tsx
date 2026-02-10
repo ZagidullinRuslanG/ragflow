@@ -123,6 +123,7 @@ export enum Operator {
   LoopStart = 'LoopItem',
   ExitLoop = 'ExitLoop',
   ExcelProcessor = 'ExcelProcessor',
+  Answer2 = 'Answer2',
 }
 
 export enum ComparisonOperator {

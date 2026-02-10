@@ -1,3 +1,4 @@
+import { AdditionalParsingInfoFormField } from '@/components/additional-parsing-info-form-field';
 import {
   AutoKeywordsFormField,
   AutoQuestionsFormField,
@@ -7,6 +8,7 @@ import { DelimiterFormField } from '@/components/delimiter-form-field';
 import { ExcelToHtmlFormField } from '@/components/excel-to-html-form-field';
 import { LayoutRecognizeFormField } from '@/components/layout-recognize-form-field';
 import { MaxTokenNumberFormField } from '@/components/max-token-number-from-field';
+import { TaskPageSizeFormField } from '@/components/task-page-size-form-field';
 import {
   ConfigurationFormContainer,
   MainContainer,
@@ -23,6 +25,7 @@ export function NaiveConfiguration() {
     <MainContainer>
       <ConfigurationFormContainer>
         <LayoutRecognizeFormField></LayoutRecognizeFormField>
+        <TaskPageSizeFormField />
         <MaxTokenNumberFormField initialValue={512}></MaxTokenNumberFormField>
         <DelimiterFormField></DelimiterFormField>
         <ChildrenDelimiterForm />
@@ -35,6 +38,7 @@ export function NaiveConfiguration() {
         <AutoKeywordsFormField></AutoKeywordsFormField>
         <AutoQuestionsFormField></AutoQuestionsFormField>
         <ExcelToHtmlFormField></ExcelToHtmlFormField>
+        <AdditionalParsingInfoFormField />
         {/* <TagItems></TagItems> */}
       </ConfigurationFormContainer>
     </MainContainer>

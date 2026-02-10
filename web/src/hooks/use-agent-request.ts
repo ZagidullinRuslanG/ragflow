@@ -30,6 +30,7 @@ import agentService, {
   deleteAgentSession,
   fetchAgentLogsByCanvasId,
   fetchAgentLogsById,
+  fetchAllAgentSessions,
   fetchPipeLineList,
   fetchTrace,
   fetchWebhookTrace,
@@ -658,6 +659,20 @@ export const useFetchAgentLog = (searchParams: IAgentLogsRequest) => {
       });
 
       return data?.data ?? [];
+    },
+  });
+
+  return { data, loading };
+};
+
+export const useFetchAllAgentSessions = (searchParams: IAgentLogsRequest) => {
+  const { data, isFetching: loading } = useQuery<IAgentLogsResponse>({
+    queryKey: ['fetchAllAgentSessions', searchParams],
+    initialData: {} as IAgentLogsResponse,
+    gcTime: 0,
+    queryFn: async () => {
+      const { data } = await fetchAllAgentSessions(searchParams);
+      return data?.data ?? { total: 0, sessions: [] };
     },
   });
 

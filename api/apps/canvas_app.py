@@ -348,6 +348,86 @@ async def upload(canvas_id):
         return server_error_response(e)
 
 
+@manager.route('/parse', methods=['POST'])  # noqa: F821
+@login_required
+async def canvas_parse():
+    """Parse an uploaded document using a knowledge base's parser configuration.
+    Expects: canvas_id (form field), file (multipart file upload).
+    The canvas must contain an Answer2 component with a configured kb_id.
+    """
+    from api.db.services.knowledgebase_service import KnowledgebaseService
+    from rag.app.naive import chunk as naive_chunk
+
+    tenant_id = current_user.id
+    form = await request.form
+    canvas_id = form.get("canvas_id")
+    if not canvas_id:
+        return get_data_error_result(message="canvas_id is required.")
+
+    if not UserCanvasService.accessible(canvas_id, tenant_id):
+        return get_json_result(
+            data=False, message='Only owner of canvas authorized for this operation.',
+            code=RetCode.OPERATING_ERROR)
+
+    files = await request.files
+    file_objs = files.getlist("file") if files and files.get("file") else []
+    if not file_objs:
+        return get_data_error_result(message="No file uploaded.")
+
+    try:
+        e, user_canvas = UserCanvasService.get_by_id(canvas_id)
+        if not e:
+            return get_data_error_result(message="Canvas not found.")
+
+        # Find Answer2 component and its kb_ids
+        kb_id = None
+        dsl = user_canvas.dsl if isinstance(user_canvas.dsl, dict) else json.loads(user_canvas.dsl)
+        for cpn_id, cpn in dsl.get("components", {}).items():
+            obj = cpn.get("obj", {})
+            if obj.get("component_name") == "Answer2":
+                kb_ids = obj.get("params", {}).get("kb_ids", [])
+                if kb_ids:
+                    kb_id = kb_ids[0]
+                break
+
+        if not kb_id:
+            return get_data_error_result(message="No Answer2 component with kb_ids found in canvas.")
+
+        e, kb = KnowledgebaseService.get_by_id(kb_id)
+        if not e:
+            return get_data_error_result(message="Knowledge base not found.")
+
+        parser_config = kb.parser_config or {}
+        file_obj = file_objs[0]
+        filename = file_obj.filename or "uploaded_file"
+        file_binary = file_obj.read()
+
+        # Use naive chunking with the KB's parser config
+        chunks = []
+        def collect_chunk(prog=None, msg=""):
+            logging.info(f"Parse progress: {prog}, {msg}")
+
+        cks = naive_chunk(
+            filename, file_binary,
+            parser_config=parser_config,
+            callback=collect_chunk,
+            kb_id=kb_id,
+            tenant_id=tenant_id
+        )
+        for ck in cks:
+            if isinstance(ck, str):
+                chunks.append({"content": ck})
+            elif isinstance(ck, dict):
+                chunks.append(ck)
+            elif isinstance(ck, (list, tuple)) and len(ck) >= 1:
+                chunks.append({"content": ck[0] if isinstance(ck[0], str) else str(ck[0])})
+
+        return get_json_result(data={"chunks": chunks, "total": len(chunks)})
+    except Exception as e:
+        logging.exception(f"Error parsing document: {e}")
+        return server_error_response(e)
+
+
 @manager.route('/input_form', methods=['GET'])  # noqa: F821
 @login_required
 def input_form():
@@ -599,6 +679,28 @@ def trace():
         return get_json_result(data=json.loads(binary.encode("utf-8")))
     except Exception as e:
         logging.exception(e)
+
+
+@manager.route('/all_sessions', methods=['GET'])  # noqa: F821
+@login_required
+def all_sessions():
+    tenant_id = current_user.id
+    page_number = int(request.args.get("page", 1))
+    items_per_page = int(request.args.get("page_size", 30))
+    keywords = request.args.get("keywords", "")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    orderby = request.args.get("orderby", "update_time")
+    if request.args.get("desc") == "False" or request.args.get("desc") == "false":
+        desc = False
+    else:
+        desc = True
+    try:
+        total, sess = API4ConversationService.get_all_by_tenant(
+            tenant_id, page_number, items_per_page, orderby, desc, keywords, from_date, to_date)
+        return get_json_result(data={"total": total, "sessions": sess})
+    except Exception as e:
+        return server_error_response(e)
 
 
 @manager.route('/<canvas_id>/sessions', methods=['GET'])  # noqa: F821

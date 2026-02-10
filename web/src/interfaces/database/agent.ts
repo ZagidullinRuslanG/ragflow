@@ -257,6 +257,8 @@ export interface IAgentLogResponse {
   dsl: string;
   reference: IReference;
   name: string;
+  agent_title?: string;
+  agent_avatar?: string;
 }
 export interface IAgentLogsResponse {
   total: number;

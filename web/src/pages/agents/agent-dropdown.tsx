@@ -9,9 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useDeleteAgent } from '@/hooks/use-agent-request';
+import {
+  useDeleteAgent,
+  useUpdateAgentSetting,
+} from '@/hooks/use-agent-request';
+import { useFetchUserInfo } from '@/hooks/use-user-setting-request';
 import { IFlow } from '@/interfaces/database/agent';
-import { PenLine, Trash2 } from 'lucide-react';
+import { Lock, PenLine, Share2, Trash2 } from 'lucide-react';
 import { MouseEventHandler, PropsWithChildren, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRenameAgent } from './use-rename-agent';
@@ -26,6 +30,10 @@ export function AgentDropdown({
   }) {
   const { t } = useTranslation();
   const { deleteAgent } = useDeleteAgent();
+  const { updateAgentSetting } = useUpdateAgentSetting();
+  const { data: userInfo } = useFetchUserInfo();
+  const isOwner = agent.user_id === userInfo?.id;
+  const isShared = agent.permission === 'team';
 
   const handleShowAgentRenameModal: MouseEventHandler<HTMLDivElement> =
     useCallback(
@@ -40,6 +48,18 @@ export function AgentDropdown({
     deleteAgent([agent.id]);
   }, [agent.id, deleteAgent]);
 
+  const handleToggleShare: MouseEventHandler<HTMLDivElement> = useCallback(
+    (e) => {
+      e.stopPropagation();
+      updateAgentSetting({
+        id: agent.id,
+        title: agent.title,
+        permission: isShared ? 'me' : 'team',
+      });
+    },
+    [agent.id, agent.title, isShared, updateAgentSetting],
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
@@ -47,6 +67,19 @@ export function AgentDropdown({
         <DropdownMenuItem onClick={handleShowAgentRenameModal}>
           {t('common.rename')} <PenLine />
         </DropdownMenuItem>
+        {isOwner && (
+          <DropdownMenuItem onClick={handleToggleShare}>
+            {isShared ? (
+              <>
+                {t('common.makePrivate', 'Make private')} <Lock />
+              </>
+            ) : (
+              <>
+                {t('common.shareWithTeam', 'Share with team')} <Share2 />
+              </>
+            )}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <ConfirmDeleteDialog
           onOk={handleDelete}

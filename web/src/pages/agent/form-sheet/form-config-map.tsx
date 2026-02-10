@@ -1,5 +1,6 @@
 import { Operator } from '../constant';
 import AgentForm from '../form/agent-form';
+import Answer2Form from '../form/answer2-form';
 import ArXivForm from '../form/arxiv-form';
 import BeginForm from '../form/begin-form';
 import BingForm from '../form/bing-form';
@@ -180,5 +181,8 @@ export const FormConfigMap = {
   },
   [Operator.ExitLoop]: {
     component: () => <></>,
+  },
+  [Operator.Answer2]: {
+    component: Answer2Form,
   },
 };

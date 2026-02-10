@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { RAGFlowPagination } from '@/components/ui/ragflow-pagination';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
 import { useFetchAgentListByPage } from '@/hooks/use-agent-request';
 import { t } from 'i18next';
@@ -19,6 +20,7 @@ import { Clipboard, ClipboardPlus, FileInput, Plus } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { AgentCard } from './agent-card';
+import { AgentSessionsList } from './agent-sessions-list';
 import { CreateAgentDialog } from './create-agent-dialog';
 import { useCreateAgentOrPipeline } from './hooks/use-create-agent';
 import { useSelectFilters } from './hooks/use-selelct-filters';
@@ -119,8 +121,8 @@ export default function Agents() {
       )}
       <section className="flex flex-col w-full flex-1">
         {(!!data?.length || searchString) && (
-          <>
-            <div className="px-8 pt-8 ">
+          <Tabs defaultValue="agents" className="flex flex-col flex-1">
+            <div className="px-8 pt-8">
               <ListFilterBar
                 title={t('flow.agents')}
                 searchString={searchString}
@@ -130,72 +132,85 @@ export default function Agents() {
                 onChange={handleFilterSubmit}
                 value={filterValue}
               >
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button>
-                      <Plus className="h-4 w-4" />
-                      {t('flow.createGraph')}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      justifyBetween={false}
-                      onClick={showCreatingModal}
-                    >
-                      <Clipboard />
-                      {t('flow.createFromBlank')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      justifyBetween={false}
-                      onClick={navigateToAgentTemplates}
-                    >
-                      <ClipboardPlus />
-                      {t('flow.createFromTemplate')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      justifyBetween={false}
-                      onClick={handleImportJson}
-                    >
-                      <FileInput />
-                      {t('flow.importJsonFile')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  <TabsList>
+                    <TabsTrigger value="agents">{t('flow.agents')}</TabsTrigger>
+                    <TabsTrigger value="sessions">
+                      {t('flow.sessionsHistory')}
+                    </TabsTrigger>
+                  </TabsList>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger>
+                      <Button>
+                        <Plus className="h-4 w-4" />
+                        {t('flow.createGraph')}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem
+                        justifyBetween={false}
+                        onClick={showCreatingModal}
+                      >
+                        <Clipboard />
+                        {t('flow.createFromBlank')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        justifyBetween={false}
+                        onClick={navigateToAgentTemplates}
+                      >
+                        <ClipboardPlus />
+                        {t('flow.createFromTemplate')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        justifyBetween={false}
+                        onClick={handleImportJson}
+                      >
+                        <FileInput />
+                        {t('flow.importJsonFile')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </ListFilterBar>
             </div>
-            {(!data?.length || data?.length <= 0) && searchString && (
-              <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
-                <EmptyAppCard
-                  showIcon
-                  size="large"
-                  className="w-[480px] p-14"
-                  isSearch={!!searchString}
-                  type={EmptyCardType.Agent}
-                  onClick={() => showCreatingModal()}
-                />
+            <TabsContent value="agents" className="flex-1 flex flex-col">
+              {(!data?.length || data?.length <= 0) && searchString && (
+                <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
+                  <EmptyAppCard
+                    showIcon
+                    size="large"
+                    className="w-[480px] p-14"
+                    isSearch={!!searchString}
+                    type={EmptyCardType.Agent}
+                    onClick={() => showCreatingModal()}
+                  />
+                </div>
+              )}
+              <div className="flex-1 overflow-auto">
+                <CardContainer className="max-h-[calc(100dvh-280px)] overflow-auto px-8">
+                  {data.map((x) => {
+                    return (
+                      <AgentCard
+                        key={x.id}
+                        data={x}
+                        showAgentRenameModal={showAgentRenameModal}
+                      ></AgentCard>
+                    );
+                  })}
+                </CardContainer>
               </div>
-            )}
-            <div className="flex-1 overflow-auto">
-              <CardContainer className="max-h-[calc(100dvh-280px)] overflow-auto px-8">
-                {data.map((x) => {
-                  return (
-                    <AgentCard
-                      key={x.id}
-                      data={x}
-                      showAgentRenameModal={showAgentRenameModal}
-                    ></AgentCard>
-                  );
-                })}
-              </CardContainer>
-            </div>
-            <div className="mt-8 px-8 pb-8">
-              <RAGFlowPagination
-                {...pick(pagination, 'current', 'pageSize')}
-                total={pagination.total}
-                onChange={handlePageChange}
-              ></RAGFlowPagination>
-            </div>
-          </>
+              <div className="mt-8 px-8 pb-8">
+                <RAGFlowPagination
+                  {...pick(pagination, 'current', 'pageSize')}
+                  total={pagination.total}
+                  onChange={handlePageChange}
+                ></RAGFlowPagination>
+              </div>
+            </TabsContent>
+            <TabsContent value="sessions" className="flex-1">
+              <AgentSessionsList />
+            </TabsContent>
+          </Tabs>
         )}
         {agentRenameVisible && (
           <RenameDialog

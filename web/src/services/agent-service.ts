@@ -167,4 +167,8 @@ export const deleteAgentSession = (canvasId: string, sessionId: string) => {
   return request.delete(api.fetchAgentLogsById(canvasId, sessionId));
 };
 
+export const fetchAllAgentSessions = (params: IAgentLogsRequest) => {
+  return request.get(api.fetchAllAgentSessions, { params });
+};
+
 export default agentService;

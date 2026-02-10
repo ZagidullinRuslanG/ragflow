@@ -200,6 +200,7 @@ export default {
   fetchCanvas: (id: string) => `${api_host}/canvas/get/${id}`,
   fetchAgentAvatar: (id: string) => `${api_host}/canvas/getsse/${id}`,
   uploadAgentFile: (id?: string) => `${api_host}/canvas/upload/${id}`,
+  fetchAllAgentSessions: `${api_host}/canvas/all_sessions`,
   fetchAgentLogs: (canvasId: string) =>
     `${api_host}/canvas/${canvasId}/sessions`,
   fetchAgentLogsById: (canvasId: string, sessionId: string) =>

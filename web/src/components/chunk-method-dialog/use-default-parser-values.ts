@@ -38,6 +38,7 @@ export function useDefaultParserValues() {
       pages: [],
       metadata: [],
       enable_metadata: false,
+      additional_parsing_info: '',
     };
 
     return defaultParserValues as IParserConfig;

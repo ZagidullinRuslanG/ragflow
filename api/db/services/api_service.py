@@ -17,7 +17,7 @@ from datetime import datetime
 
 import peewee
 
-from api.db.db_models import DB, API4Conversation, APIToken, Dialog
+from api.db.db_models import DB, API4Conversation, APIToken, Dialog, UserCanvas
 from api.db.services.common_service import CommonService
 from common.time_utils import current_timestamp, datetime_format
 
@@ -76,7 +76,39 @@ class API4ConversationService(CommonService):
         sessions = sessions.paginate(page_number, items_per_page)
 
         return count, list(sessions.dicts())
-    
+
+    @classmethod
+    @DB.connection_context()
+    def get_all_by_tenant(cls, tenant_id, page_number=1, items_per_page=30,
+                          orderby="update_time", desc=True, keywords="",
+                          from_date=None, to_date=None):
+        canvas_ids = [c.id for c in UserCanvas.select(UserCanvas.id).where(UserCanvas.user_id == tenant_id)]
+        if not canvas_ids:
+            return 0, []
+        sessions = cls.model.select(
+            cls.model,
+            UserCanvas.title.alias("agent_title"),
+            UserCanvas.avatar.alias("agent_avatar"),
+        ).join(
+            UserCanvas, on=(cls.model.dialog_id == UserCanvas.id)
+        ).where(
+            cls.model.dialog_id.in_(canvas_ids),
+            cls.model.source == "agent",
+        )
+        if keywords:
+            sessions = sessions.where(peewee.fn.LOWER(cls.model.message).contains(keywords.lower()))
+        if from_date:
+            sessions = sessions.where(cls.model.create_date >= from_date)
+        if to_date:
+            sessions = sessions.where(cls.model.create_date <= to_date)
+        if desc:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).desc())
+        else:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).asc())
+        count = sessions.count()
+        sessions = sessions.paginate(page_number, items_per_page)
+        return count, list(sessions.dicts())
+
     @classmethod
     @DB.connection_context()
     def get_names(cls, dialog_id, exp_user_id):

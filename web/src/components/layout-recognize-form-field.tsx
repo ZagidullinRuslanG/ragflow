@@ -6,8 +6,8 @@ import { camelCase } from 'lodash';
 import { ReactNode, useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { MinerUOptionsFormField } from './mineru-options-form-field';
-import { PaddleOCROptionsFormField } from './paddleocr-options-form-field';
 import { SelectWithSearch } from './originui/select-with-search';
+import { PaddleOCROptionsFormField } from './paddleocr-options-form-field';
 import {
   FormControl,
   FormField,
@@ -21,6 +21,8 @@ export const enum ParseDocumentType {
   PlainText = 'Plain Text',
   Docling = 'Docling',
   TCADPParser = 'TCADP Parser',
+  CustomPDFMiner = 'Custom PDFMiner',
+  CustomVisionLLM = 'Custom Vision LLM',
 }
 
 export function LayoutRecognizeFormField({
@@ -51,6 +53,8 @@ export function LayoutRecognizeFormField({
           ParseDocumentType.PlainText,
           ParseDocumentType.Docling,
           ParseDocumentType.TCADPParser,
+          ParseDocumentType.CustomPDFMiner,
+          ParseDocumentType.CustomVisionLLM,
         ].map((x) => ({
           label: x === ParseDocumentType.PlainText ? t(camelCase(x)) : x,
           value: x,
