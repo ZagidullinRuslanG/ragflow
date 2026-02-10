@@ -5,7 +5,7 @@ services:
   ragflow:
     platform: linux/amd64
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     build:
       context: ../
