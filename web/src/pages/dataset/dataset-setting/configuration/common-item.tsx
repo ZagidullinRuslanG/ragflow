@@ -133,11 +133,10 @@ export const EmbeddingSelect = ({
       <SelectWithSearch
         onChange={async (value) => {
           field.onChange(value);
-          if (isEdit && disabled) {
+          if (disabled) {
             setLoading(true);
             const res = await handleChange({
               embed_id: value,
-              // callback: field.onChange,
             });
             if (res.code !== 0) {
               field.onChange(oldValue);
@@ -145,7 +144,7 @@ export const EmbeddingSelect = ({
             setLoading(false);
           }
         }}
-        disabled={disabled && !isEdit}
+        disabled={false}
         value={field.value}
         options={embeddingModelOptions}
         placeholder={t('embeddingModelPlaceholder')}
