@@ -85,7 +85,7 @@ export function setChatVariableEnabledFieldValuePage() {
 }
 
 const oldReg = /(#{2}\d+\${2})/g;
-export const currentReg = /\[ID:(\d+)\]/g;
+export const currentReg = /\[ID:\s*(\d+)\s*\]/g;
 
 // To be compatible with the old index matching mode
 export const replaceTextByOldReg = (text: string) => {
