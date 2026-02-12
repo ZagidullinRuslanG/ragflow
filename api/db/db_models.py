@@ -1396,6 +1396,8 @@ def migrate_db():
     alter_db_add_column(migrator, "llm_factories", "rank", IntegerField(default=0, index=False))
     alter_db_add_column(migrator, "api_4_conversation", "name", CharField(max_length=255, null=True, help_text="conversation name", index=False))
     alter_db_add_column(migrator, "api_4_conversation", "exp_user_id", CharField(max_length=255, null=True, help_text="exp_user_id", index=True))
+    alter_db_add_column(migrator, "api_4_conversation", "user_name", CharField(max_length=255, null=True, help_text="display name for external users", index=True))
+    alter_db_add_column(migrator, "api_4_conversation", "is_external", BooleanField(default=False, help_text="true if from embedded widget", index=True))
     # Migrate system_settings.value from CharField to TextField for longer sandbox configs
     alter_db_column_type(migrator, "system_settings", "value", TextField(null=False, help_text="Configuration value (JSON, string, etc.)"))
     logging.disable(logging.NOTSET)
